@@ -24,11 +24,12 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Camera Calibrator - OpenCV and Emanuele Ruffaldi SSSA 2014-2015')
     parser.add_argument('path', help='path where images can be found (png or jpg)',nargs="+")
     parser.add_argument('--save', help='name of output calibration in YAML otherwise prints on console')
-    parser.add_argument('--square_size',help='square size in mm',type=float,default=0.025)
     parser.add_argument('--verbose',action="store_true")
     parser.add_argument('--debug',help="debug dir for chessboard markers",default="")
     parser.add_argument('--pattern_size',default=(9,6),help="pattern as (w,h)",type=lambda s: coords(s,'Pattern'), nargs=2)
     parser.add_argument('--target_size',default=None,help="target image as (w,h) pixels",type=lambda s: coords(s,'Target Image'), nargs=2)
+    parser.add_argument('--aperture',default=None,help="sensor size in m as (w,h)",type=lambda s: coords(s,'Aperture'), nargs=2)
+    parser.add_argument('--square_size',help='square size in m',type=float,default=0.025)
     args = parser.parse_args()
 
     img_names = []
@@ -47,6 +48,9 @@ if __name__ == '__main__':
     target = args.target_size
     h, w = 0, 0
     lastsize = None
+    criteriasub = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
+    criteriacal = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 120, 0.001)
+
     print "images",img_names
     for fn in sorted(img_names):
         print fn,'processing'
@@ -71,8 +75,7 @@ if __name__ == '__main__':
                     h,w = target
         found, corners = cv2.findChessboardCorners(img, pattern_size)
         if found:
-            term = ( cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_COUNT, 30, 0.1 )
-            cv2.cornerSubPix(img, corners, (5, 5), (-1, -1), term)
+            cv2.cornerSubPix(img, corners, (5, 5), (-1, -1), criteriasub)
         if debug_dir == "":
             vis = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
             cv2.drawChessboardCorners(vis, pattern_size, corners, found)
@@ -87,11 +90,27 @@ if __name__ == '__main__':
         obj_points.append(pattern_points)
 
 
-    rms, camera_matrix, dist_coefs, rvecs, tvecs = cv2.calibrateCamera(obj_points, img_points, (w, h), None, None)
+    print "calibrating..."
+    rms, camera_matrix, dist_coefs, rvecs, tvecs = cv2.calibrateCamera(obj_points, img_points, (w, h), None, None,criteria=criteriacal)
     print "error:", rms
     print "camera matrix:\n", camera_matrix
     print "distortion coefficients:", dist_coefs.transpose()
     #cv2.destroyAllWindows()
+
+    #apertureWidth
+    #apertureHeight
+    if args.aperture:
+        fovx,fovy,focalLength,principalPoint,aspectRatio = cv2.calibrationMatrixValues(camera_matrix,(w,h),args.aperture[0],args.aperture[1])
+
+    if False:
+        # This is the code that computes rms
+        tot_error = 0
+        for i in xrange(len(obj_points)):
+            imgpoints2, _ = cv2.projectPoints(obj_points[i], rvecs[i], tvecs[i], camera_matrix, dist_coefs)
+            error = cv2.norm(img_points[i],imgpoints2, cv2.NORM_L2)/len(imgpoints2)
+            tot_error += error
+        mean_error = tot_error/len(obj_points)
+        print "total error: ", mean_error
 
     outname = args.save
     if outname is not None:

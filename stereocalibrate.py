@@ -8,6 +8,7 @@ import sys
 import argparse
 from glob import glob
 
+
 def splitfn(x):
     import os
     path,name = os.path.split(x)
