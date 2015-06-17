@@ -30,6 +30,7 @@ if __name__ == '__main__':
     parser.add_argument('--target_size',default=None,help="target image as (w,h) pixels",type=lambda s: coords(s,'Target Image'), nargs=2)
     parser.add_argument('--aperture',default=None,help="sensor size in m as (w,h)",type=lambda s: coords(s,'Aperture'), nargs=2)
     parser.add_argument('--square_size',help='square size in m',type=float,default=0.025)
+    parser.add_argument('--nodistortion',action="store_true");
     args = parser.parse_args()
 
     img_names = []
@@ -89,9 +90,11 @@ if __name__ == '__main__':
         img_points.append(corners.reshape(-1, 2))
         obj_points.append(pattern_points)
 
-
+    flags = 0
+    if args.nodistortion:
+        flags = cv2.CALIB_FIX_K1 | cv2.CALIB_FIX_K2 | cv2.CALIB_FIX_K3 | cv2.CALIB_FIX_K4 | cv2.CALIB_FIX_K5 | cv2.CALIB_FIX_K6 | cv2.CALIB_ZERO_TANGENT_DIST
     print "calibrating..."
-    rms, camera_matrix, dist_coefs, rvecs, tvecs = cv2.calibrateCamera(obj_points, img_points, (w, h), None, None,criteria=criteriacal)
+    rms, camera_matrix, dist_coefs, rvecs, tvecs = cv2.calibrateCamera(obj_points, img_points, (w, h), None, None,criteria=criteriacal,flags=flags)
     print "error:", rms
     print "camera matrix:\n", camera_matrix
     print "distortion coefficients:", dist_coefs.transpose()
