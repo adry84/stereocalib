@@ -13,3 +13,8 @@ python stereocalibrate.py --images1 ../depthview/color --images2 ../depthview/ir
 ROS based calibrator: http://wiki.ros.org/camera_calibration/Tutorials/MonocularCalibration
 
 Visual Inertial Calibrator vis-calib: https://github.com/arpg/vicalib
+
+
+The concept is trivial but some discussion for Kinect is in these two papers: 
+	http://www.mas.bg.ac.rs/_media/istrazivanje/fme/vol43/1/8_bkaran.pdf
+	http://www.cse.oulu.fi/~dherrera/papers/2012-KinectJournal.pdf
