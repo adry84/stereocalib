@@ -18,3 +18,5 @@ Visual Inertial Calibrator vis-calib: https://github.com/arpg/vicalib
 The concept is trivial but some discussion for Kinect is in these two papers: 
 	http://www.mas.bg.ac.rs/_media/istrazivanje/fme/vol43/1/8_bkaran.pdf
 	http://www.cse.oulu.fi/~dherrera/papers/2012-KinectJournal.pdf
+
+Related: https://github.com/erget/StereoVision/tree/master/stereovision

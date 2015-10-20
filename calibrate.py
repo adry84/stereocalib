@@ -31,6 +31,7 @@ if __name__ == '__main__':
     parser.add_argument('--save', help='name of output calibration in YAML otherwise prints on console')
     parser.add_argument('--verbose',action="store_true")
     parser.add_argument('--ir',action='store_true')
+    parser.add_argument('--side',help="side: all,left,right",default="all")
     #parser.add_argument('--load',help="read intrinsics from file")
     #parser.add_argument('--nocalibrate',action="store_true",help="performs only reprojection")
     #parser.add_argument('--noextract',action="store_true",help="assumes features already computed (using yaml files and not the images)")
@@ -42,7 +43,9 @@ if __name__ == '__main__':
     parser.add_argument('--nodistortion',action="store_true");
     args = parser.parse_args()
 
-
+    # From documentation http://docs.opencv.org/modules/calib3d/doc/camera_calibration_and_3d_reconstruction.html
+    # C default of cvFindChessboardCorners is ADAPT+NORM
+    # Python default of cvFindChessboardCorners is ADAPT 
     if args.ir:
         eflags = cv2.CALIB_CB_ADAPTIVE_THRESH + cv2.CALIB_CB_NORMALIZE_IMAGE
     else:
@@ -86,6 +89,19 @@ if __name__ == '__main__':
           print fn,"failed to load"
           continue
         h, w = img.shape[:2]
+        if args.side == "left":
+            if len(img.shape)== 3:
+                img = img[0:h,0:w/2,:]
+            else:
+                img = img[0:h,0:w/2]
+            w = w/2
+        elif args.side == "right":
+            if len(img.shape)== 3:
+                img = img[0:h,w/2:,:]
+            else:
+                img = img[0:h,w/2:]
+            w = w/2
+
         if target is not None and (h,w) != target:
             print fn, (h,w),"->",target
             img = cv2.resize(img,target)
