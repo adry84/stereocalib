@@ -65,9 +65,16 @@ if __name__ == '__main__':
     for i,e in enumerate(images[0]):            
         fn  = os.path.split(e)[1]
         if not fn in images2set:
-            continue
+		print "missing file in set 1",e
+		continue
         cam1info = loadimageinfo(e)
+	if len(cam1info["image_points"]) == 0:
+		print "missing chessboard in set 1 for file",e
+		continue
         cam2info = loadimageinfo(images2set[fn])
+	if len(cam2info["image_points"]) == 0:
+		print "missing chessboard in set 2 for file",images2set[fn]
+		continue
         cam1size = (cam1info["height"],cam1info["width"])
         cam2size = (cam2info["height"],cam2info["width"])
         print fn,cam1size,cam2size,cam1info["world_points"].shape,cam1info["image_points"].shape,cam2info["image_points"].shape

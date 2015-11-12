@@ -127,6 +127,8 @@ if __name__ == '__main__':
             cv2.imwrite('%s/%s_chess.png' % (debug_dir, name), vis)
         if not found:
             print fn,'chessboard not found'
+	    if os.path.isfile(os.path.splitext(fn)[0]+".yaml"):
+		    os.unlink(os.path.splitext(fn)[0]+".yaml")
             continue
         info = dict(width=w,height=h,image_points=corners.reshape(-1,2).tolist(),world_points=pattern_points.tolist())
         yaml.dump(info,open(os.path.splitext(fn)[0]+".yaml","wb"))
