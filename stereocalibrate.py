@@ -8,7 +8,101 @@ import sys
 import argparse
 from glob import glob
 
+yamltemplate = """%YAML:1.0
+rgb_intrinsics: !!opencv-matrix
+   rows: 3
+   cols: 3
+   dt: d
+   data: [$RGBK]
+rgb_distortion: !!opencv-matrix
+   rows: 1
+   cols: 5
+   dt: d
+   data: [$RGBD ]
+depth_intrinsics: !!opencv-matrix
+   rows: 3
+   cols: 3
+   dt: d
+   data: [$DEPTHK]
+depth_distortion: !!opencv-matrix
+   rows: 1
+   cols: 5
+   dt: d
+   data: [$DEPTHD]
+R: !!opencv-matrix
+   rows: 3
+   cols: 3
+   dt: d
+   data: [ $R ]
+T: !!opencv-matrix
+   rows: 3
+   cols: 1
+   dt: d
+   data: [ $T ]
+R_extrinsics: !!opencv-matrix
+   rows: 3
+   cols: 3
+   dt: d
+   data: [$R]
+T_extrinsics: !!opencv-matrix
+   rows: 3
+   cols: 1
+   dt: d
+   data: [ $T ]
+rgb_size: !!opencv-matrix
+   rows: 1
+   cols: 2
+   dt: i
+   data: [ $RGBSIZE ]
+raw_rgb_size: !!opencv-matrix
+   rows: 1
+   cols: 2
+   dt: i
+   data: [ $RGBSIZE ]
+depth_size: !!opencv-matrix
+   rows: 1
+   cols: 2
+   dt: i
+   data: [ $DEPTHSIZE  ]
+raw_depth_size: !!opencv-matrix
+   rows: 1
+   cols: 2
+   dt: i
+   data: [ $DEPTHSIZE ]
+raw_depth_unit_in_meters: !!opencv-matrix
+   rows: 1
+   cols: 1
+   dt: f
+   data: [ 1.00000005e-003 ]
+min_max_depth_in_meters: !!opencv-matrix
+   rows: 2
+   cols: 1
+   dt: f
+   data: [ 4.00000006e-001, 5. ]
+infrared_size: !!opencv-matrix
+   rows: 1
+   cols: 2
+   dt: i
+   data: [ 0, 0 ]
+depth_base_and_offset: !!opencv-matrix
+   rows: 1
+   cols: 2
+   dt: f
+   data: [ 7.50000030e-002, 1090. ]
+depth_multiplicative_correction_factor: !!opencv-matrix
+   rows: 1
+   cols: 1
+   dt: f
+   data: [ 1. ]
+depth_additive_correction_factor: !!opencv-matrix
+   rows: 1
+   cols: 1
+   dt: f
+   data: [ 0. ]"""
 
+
+def flatten(y):
+    return ",".join([str(x) for x in y.flatten()])
 def splitfn(x):
     import os
     path,name = os.path.split(x)
@@ -35,16 +129,27 @@ if __name__ == '__main__':
     parser.add_argument('--images2', help='path to yaml files of camera 2',required=True)
     parser.add_argument('--calib1', help='calibration file of camera 1',required=True)
     parser.add_argument('--calib2', help='calibration file of camera 2',required=True)
+    parser.add_argument('--suffix1', help='suffix for key')
+    parser.add_argument('--suffix2', help='suffix for key')
+    parser.add_argument('--savealt', help='name of output calibration in YAML otherwise prints on console')
     parser.add_argument('--save', help='name of output calibration in YAML otherwise prints on console')
     parser.add_argument('--verbose',action="store_true")
     args = parser.parse_args()
 
     term_crit = (cv2.TERM_CRITERIA_MAX_ITER + cv2.TERM_CRITERIA_EPS, 200, 1e-8)
 
-    images = [glob(args.images1+"/*.yaml"),glob(args.images2+"/*.yaml")]
+    images = []
+    if os.path.isdir(args.images1):
+        images.append(glob(args.images1+"/*.yaml"))
+    else:
+        images.append(glob(args.images1))
+    if os.path.isdir(args.images2):
+        images.append(glob(args.images2+"/*.yaml"))
+    else:
+        images.append(glob(args.images2))
     images2set = dict()
     for x in images[1]:
-        images2set[os.path.split(x)[1]] = x
+        images2set[os.path.split(x)[1][0:-len(args.suffix2)]] = x  # remove the suffix if any
 
 
     paramir = args.calib1
@@ -64,23 +169,24 @@ if __name__ == '__main__':
 
     for i,e in enumerate(images[0]):            
         fn  = os.path.split(e)[1]
+        fn = fn[0:-len(args.suffix1)] # remove the suffix if any
         if not fn in images2set:
-		print "missing file in set 1",e
-		continue
+            print "missing file in set 1",e
+            continue
         cam1info = loadimageinfo(e)
-	if len(cam1info["image_points"]) == 0:
-		print "missing chessboard in set 1 for file",e
-		continue
+        if len(cam1info["image_points"]) == 0:
+            print "missing chessboard in set 1 for file",e
+            continue
         cam2info = loadimageinfo(images2set[fn])
-	if len(cam2info["image_points"]) == 0:
-		print "missing chessboard in set 2 for file",images2set[fn]
-		continue
-        cam1size = (cam1info["height"],cam1info["width"])
-        cam2size = (cam2info["height"],cam2info["width"])
-        print fn,cam1size,cam2size,cam1info["world_points"].shape,cam1info["image_points"].shape,cam2info["image_points"].shape
-        obj_points.append(cam1info["world_points"])
-        img_points1.append(cam1info["image_points"])
-        img_points2.append(cam2info["image_points"])
+        if len(cam2info["image_points"]) == 0:
+            print "missing chessboard in set 2 for file",images2set[fn]
+        else:
+            cam1size = (cam1info["height"],cam1info["width"])
+            cam2size = (cam2info["height"],cam2info["width"])
+            print fn,cam1size,cam2size,cam1info["world_points"].shape,cam1info["image_points"].shape,cam2info["image_points"].shape
+            obj_points.append(cam1info["world_points"])
+            img_points1.append(cam1info["image_points"])
+            img_points2.append(cam2info["image_points"])
 
 
     flags = 0
@@ -111,8 +217,27 @@ if __name__ == '__main__':
     
     #cv2.destroyAllWindows()
 
-    outname = args.save
+    outname = args.savealt
     if outname is not None:
         ci = dict(rms=retval,T=T.tolist(),R=R.tolist(),E=E.tolist(),F=F.tolist(),K1=cameraMatrix1.tolist(),K2=cameraMatrix2.tolist(),d1=distCoeffs1.tolist(),d2=distCoeffs2.tolist())
         print ci
         yaml.dump(ci,open(outname,"wb"))
+
+    outname = args.save
+    if outname is not None:
+        # Save 
+        d = {}
+        d["$RGBK"] = flatten(cameraMatrix1)
+        d["$RGBD"] = flatten(cameraMatrix2)
+        d["$DEPTHK"] = flatten(distCoeffs1)
+        d["$DEPTHD"] = flatten(distCoeffs2)
+        d["$R"] = flatten(R)
+        d["$T"] = flatten(T)
+
+        d["$RGBSIZE"] = "%d,%d" % (cam1size[1],cam1size[0])
+        d["$DEPTHSIZE"] = "%d,%d" % (cam2size[1],cam2size[0])
+        yamlout = yamltemplate
+        for k,v in d.iteritems():
+            yamlout = yamlout.replace(k,v)
+        open(outname,"wb").write(yamlout)
+
