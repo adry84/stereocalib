@@ -13,62 +13,62 @@ rgb_intrinsics: !!opencv-matrix
    rows: 3
    cols: 3
    dt: d
-   data: [$RGBK]
+   data: [$RGBK$]
 rgb_distortion: !!opencv-matrix
    rows: 1
    cols: 5
    dt: d
-   data: [$RGBD ]
+   data: [$RGBD$]
 depth_intrinsics: !!opencv-matrix
    rows: 3
    cols: 3
    dt: d
-   data: [$DEPTHK]
+   data: [$DEPTHK$]
 depth_distortion: !!opencv-matrix
    rows: 1
    cols: 5
    dt: d
-   data: [$DEPTHD]
+   data: [$DEPTHD$]
 R: !!opencv-matrix
    rows: 3
    cols: 3
    dt: d
-   data: [ $R ]
+   data: [ $R$]
 T: !!opencv-matrix
    rows: 3
    cols: 1
    dt: d
-   data: [ $T ]
+   data: [ $T$]
 R_extrinsics: !!opencv-matrix
    rows: 3
    cols: 3
    dt: d
-   data: [$R]
+   data: [$R$]
 T_extrinsics: !!opencv-matrix
    rows: 3
    cols: 1
    dt: d
-   data: [ $T ]
+   data: [ $T$]
 rgb_size: !!opencv-matrix
    rows: 1
    cols: 2
    dt: i
-   data: [ $RGBSIZE ]
+   data: [ $RGBSIZE$]
 raw_rgb_size: !!opencv-matrix
    rows: 1
    cols: 2
    dt: i
-   data: [ $RGBSIZE ]
+   data: [ $RGBSIZE$]
 depth_size: !!opencv-matrix
    rows: 1
    cols: 2
    dt: i
-   data: [ $DEPTHSIZE  ]
+   data: [ $DEPTHSIZE$]
 raw_depth_size: !!opencv-matrix
    rows: 1
    cols: 2
    dt: i
-   data: [ $DEPTHSIZE ]
+   data: [ $DEPTHSIZE$]
 raw_depth_unit_in_meters: !!opencv-matrix
    rows: 1
    cols: 1
@@ -227,15 +227,15 @@ if __name__ == '__main__':
     if outname is not None:
         # Save 
         d = {}
-        d["$RGBK"] = flatten(cameraMatrix1)
-        d["$RGBD"] = flatten(cameraMatrix2)
-        d["$DEPTHK"] = flatten(distCoeffs1)
-        d["$DEPTHD"] = flatten(distCoeffs2)
-        d["$R"] = flatten(R)
-        d["$T"] = flatten(T)
+        d["$RGBK$"] = flatten(cameraMatrix1)
+        d["$RGBD$"] = flatten(cameraMatrix2)
+        d["$DEPTHK$"] = flatten(distCoeffs1[0:5])
+        d["$DEPTHD$"] = flatten(distCoeffs2[0:5])
+        d["$R$"] = flatten(R)
+        d["$T$"] = flatten(T)
 
-        d["$RGBSIZE"] = "%d,%d" % (cam1size[1],cam1size[0])
-        d["$DEPTHSIZE"] = "%d,%d" % (cam2size[1],cam2size[0])
+        d["$RGBSIZE$"] = "%d,%d" % (cam1size[1],cam1size[0])
+        d["$DEPTHSIZE$"] = "%d,%d" % (cam2size[1],cam2size[0])
         yamlout = yamltemplate
         for k,v in d.iteritems():
             yamlout = yamlout.replace(k,v)

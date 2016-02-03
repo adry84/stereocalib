@@ -24,19 +24,19 @@ def coords(s,t):
     except:
         raise argparse.ArgumentTypeError("%s must be x,y" % t)
 
-if __name__ == '__main__':
-
+def main():
     parser = argparse.ArgumentParser(description='Camera Calibrator - OpenCV and Emanuele Ruffaldi SSSA 2014-2015')
     parser.add_argument('path', help='path where images can be found (png or jpg)',nargs="+")
     parser.add_argument('--save', help='name of output calibration in YAML otherwise prints on console')
     parser.add_argument('--verbose',action="store_true")
     parser.add_argument('--ir',action='store_true')
+    parser.add_argument('--threshold',type=int,default=0)
     parser.add_argument('--side',help="side: all,left,right",default="all")
     #parser.add_argument('--load',help="read intrinsics from file")
     #parser.add_argument('--nocalibrate',action="store_true",help="performs only reprojection")
     #parser.add_argument('--noextract',action="store_true",help="assumes features already computed (using yaml files and not the images)")
     parser.add_argument('--debug',help="debug dir for chessboard markers",default="")
-    parser.add_argument('--pattern_size',default=(6,9),help="pattern as (w,h)",type=lambda s: coords(s,'Pattern'), nargs=2)
+    parser.add_argument('--pattern_size',default=(6,9),help="pattern as (w,h)",type=lambda s: coords(s,'Pattern'))
     parser.add_argument('--target_size',default=None,help="target image as (w,h) pixels",type=lambda s: coords(s,'Target Image'), nargs=2)
     parser.add_argument('--aperture',default=None,help="sensor size in m as (w,h)",type=lambda s: coords(s,'Aperture'), nargs=2)
     parser.add_argument('--square_size',help='square size in m',type=float,default=0.025)
@@ -50,6 +50,9 @@ if __name__ == '__main__':
         eflags = cv2.CALIB_CB_ADAPTIVE_THRESH + cv2.CALIB_CB_NORMALIZE_IMAGE
     else:
         eflags = cv2.CALIB_CB_ADAPTIVE_THRESH
+    eflags += cv2.CALIB_CB_FAST_CHECK #+ cv2.CV_CALIB_CB_FILTER_QUADS
+
+    #CV_CALIB_CB_FILTER_QUADS
     if False:
         if args.intrinsics != None:
             # load yaml
@@ -84,7 +87,7 @@ if __name__ == '__main__':
     print "images",img_names
     for fn in sorted(img_names):
         print fn,'processing'
-        img = cv2.imread(fn, 0)
+        img = cv2.imread(fn)
         if img is None:
           print fn,"failed to load"
           continue
@@ -116,11 +119,19 @@ if __name__ == '__main__':
                     target = lastsize
                     img = cv2.resize(img,target)
                     h,w = target
-        found, corners = cv2.findChessboardCorners(img, pattern_size_cols_rows,flags=eflags)
+        print img.shape,img.dtype
+        gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+        print "loopkup"
+        if args.threshold > 0:
+            retval,gray = cv2.threshold(gray, args.threshold, 255, cv2.THRESH_BINARY);
+            print gray.shape,gray.dtype
+            cv2.imshow("ciao",gray)
+            cv2.waitKey(0)
+        found, corners = cv2.findChessboardCorners(gray, pattern_size_cols_rows,flags=eflags)
         if found:
             # Giacomo (11,11)
             cv2.cornerSubPix(img, corners, (5, 5), (-1, -1), criteriasub)
-        if debug_dir == "":
+        if debug_dir == "" and found:
             vis = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
             cv2.drawChessboardCorners(vis, pattern_size_cols_rows, corners, found)
             path, name, ext = splitfn(fn)
@@ -137,7 +148,9 @@ if __name__ == '__main__':
 
     
     #CV_CALIB_USE_INTRINSIC_GUESS
-    
+    if len(obj_points) == 0:
+        print "cannot find corners"
+        return
     flags = 0
     if args.nodistortion:
         flags = cv2.CALIB_FIX_K1 | cv2.CALIB_FIX_K2 | cv2.CALIB_FIX_K3 | cv2.CALIB_FIX_K4 | cv2.CALIB_FIX_K5 | cv2.CALIB_FIX_K6 | cv2.CALIB_ZERO_TANGENT_DIST
@@ -168,3 +181,5 @@ if __name__ == '__main__':
         ci = dict(image_width=w,image_height=h,pattern_size=list(pattern_size_cols_rows),rms=rms,camera_matrix=camera_matrix.tolist(),dist=dist_coefs.ravel().tolist(),square_size=square_size)
         print ci
         yaml.dump(ci,open(outname,"wb"))
+if __name__ == '__main__':
+    main()
