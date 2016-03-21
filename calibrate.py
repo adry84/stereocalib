@@ -24,6 +24,16 @@ def coords(s,t,tt):
     except:
         raise argparse.ArgumentTypeError("%s must be x,y" % t)
 
+def recaberror(img_points,obj_points,rvec,tvec,camera_matrix,dist_coeffs):
+    #Compute mean of reprojection error
+    reprojected_points, _ = cv2.projectPoints(obj_points, rvec, tvec, camera_matrix, dist_coeffs)
+    reprojected_points = reprojected_points.reshape(-1,2)
+    tot_error =np.sum(np.abs(img_points-reprojected_points)**2)
+    total_points =len(obj_points)
+
+    mean_error=np.sqrt(tot_error/total_points)
+    return mean_error
+
 def main():
     parser = argparse.ArgumentParser(description='Camera Calibrator - OpenCV and Emanuele Ruffaldi SSSA 2014-2015')
     parser.add_argument('path', help='path where images can be found (png or jpg)',nargs="+")
@@ -38,10 +48,13 @@ def main():
     parser.add_argument('--debug',help="debug dir for chessboard markers",default="")
     parser.add_argument('--pattern_size',default=(6,9),help="pattern as (w,h)",type=lambda s: coords(s,'Pattern',int))
     parser.add_argument('--square_size2',default=(0,0),help="alt square size",type=lambda s: coords(s,'Square Size',float))
-    parser.add_argument('--target_size',default=None,help="target image as (w,h) pixels",type=lambda s: coords(s,'Target Image'), nargs=2)
-    parser.add_argument('--aperture',default=None,help="sensor size in m as (w,h)",type=lambda s: coords(s,'Aperture'), nargs=2)
+    parser.add_argument('--grid_offset',default=(0,0),help="grid offset",type=lambda s: coords(s,'Square Size',float))
+    parser.add_argument('--target_size',default=None,help="target image as (w,h) pixels",type=lambda s: coords(s,'Target Image',int), nargs=2)
+    parser.add_argument('--aperture',default=None,help="sensor size in m as (w,h)",type=lambda s: coords(s,'Aperture',float), nargs=2)
     parser.add_argument('--square_size',help='square size in m',type=float,default=0.025)
     parser.add_argument('--nodistortion',action="store_true");
+    parser.add_argument('--outputpath',help="path for output yaml files");
+    parser.add_argument('--nocalibrate',action="store_true")
     args = parser.parse_args()
 
     # From documentation http://docs.opencv.org/modules/calib3d/doc/camera_calibration_and_3d_reconstruction.html
@@ -77,6 +90,10 @@ def main():
         pattern_points *= np.array([args.square_size2[0],args.square_size2[1],0.0])
     else:
         pattern_points *= args.square_size
+    if args.grid_offset[0] != 0 or args.grid_offset[1] != 0:
+        pattern_points[:,0] += args.grid_offset[0]
+        pattern_points[:,1] += args.grid_offset[1]
+
 
     obj_points = []
     img_points = []
@@ -91,8 +108,12 @@ def main():
     #for both sub and cal cv::TermCriteria term_criteria(cv::TermCriteria::COUNT + cv::TermCriteria::EPS, 50, DBL_EPSILON);
 
     print "images",img_names
-    for fn in sorted(img_names):
-        print fn,'processing'
+    j = 0
+    for fn in (sorted(img_names)):
+        if fn.endswith(".yaml"):
+            continue
+        j = j +1
+        print fn,'processing',j
         img = cv2.imread(fn,-1)
         if img is None:
           print fn,"failed to load"
@@ -125,13 +146,10 @@ def main():
                     target = lastsize
                     img = cv2.resize(img,target)
                     h,w = target
-        print img.shape,img.dtype
         if len(img.shape) == 3 and img.shape[2] == 3:
             img = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
-            print "now",img.shape,img.dtype
         else:
             pattern_size_cols_rows
-        print "loopkup"
         if args.threshold > 0:
             retval,img = cv2.threshold(img, args.threshold, 255, cv2.THRESH_BINARY);
             print "thresholded ",img.shape,gray.dtype
@@ -142,66 +160,64 @@ def main():
         if found:
             # Giacomo (11,11)
             cv2.cornerSubPix(img, corners, (5, 5), (-1, -1), criteriasub)
-        if debug_dir == "" and found:
-            vis = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-            cv2.drawChessboardCorners(vis, pattern_size_cols_rows, corners, found)
-            path, name, ext = splitfn(fn)
-            cv2.imwrite('%s/%s_chess.png' % (debug_dir, name), vis)
         if not found:
             print fn,'chessboard not found'
-	    if os.path.isfile(os.path.splitext(fn)[0]+".yaml"):
-		    os.unlink(os.path.splitext(fn)[0]+".yaml")
             continue
+        if args.outputpath:
+            yamlfile = os.path.join(args.outputpath,s.path.splitext(os.path.split(fn)[1])[0]+".yaml")
+        else:
+            yamlfile = os.path.splitext(fn)[0]+".yaml"
+
         info = dict(width=w,height=h,image_points=corners.reshape(-1,2).tolist(),world_points=pattern_points.tolist())
-        yaml.dump(info,open(os.path.splitext(fn)[0]+".yaml","wb"))
+        yaml.dump(info,open(yamlfile,"wb"))
+        print "\tgenerated yaml"
         img_points.append(corners.reshape(-1, 2))
         obj_points.append(pattern_points)
-        yaml_done.append(os.path.splitext(fn)[0]+".yaml")
+        yaml_done.append(yamlfile)
+        if debug_dir is not None:
+            vis = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+            cv2.drawChessboardCorners(vis, pattern_size_cols_rows, corners, found)
+            path,name = os.path.split(fn)
+            name,ext = os.path.splitext(name)
+            dd = '%s/%s_chess.png' % (debug_dir, name)
+            cv2.imwrite(dd, vis)
+            print "\twriting debug",dd
 
-    
-    #CV_CALIB_USE_INTRINSIC_GUESS
-    if len(obj_points) == 0:
-        print "cannot find corners"
-        return
-    flags = 0
-    if args.nodistortion:
-        flags = cv2.CALIB_FIX_K1 | cv2.CALIB_FIX_K2 | cv2.CALIB_FIX_K3 | cv2.CALIB_FIX_K4 | cv2.CALIB_FIX_K5 | cv2.CALIB_FIX_K6 | cv2.CALIB_ZERO_TANGENT_DIST
-    print "calibrating...",len(img_points)
-    print obj_points[0].shape
-    print img_points[0].shape
-    rms, camera_matrix, dist_coefs, rvecs, tvecs = cv2.calibrateCamera(obj_points, img_points, (w, h), None, None,criteria=criteriacal,flags=flags)
-    print "error:", rms
-    print "camera matrix:\n", camera_matrix
-    print "distortion coefficients:", dist_coefs.transpose()
-    #cv2.destroyAllWindows()
+    if not args.nocalibrate:    
 
-    #apertureWidth
-    #apertureHeight
-    if args.aperture:
-        fovx,fovy,focalLength,principalPoint,aspectRatio = cv2.calibrationMatrixValues(camera_matrix,(w,h),args.aperture[0],args.aperture[1])
+        #CV_CALIB_USE_INTRINSIC_GUESS
+        if len(obj_points) == 0:
+            print "cannot find corners"
+            return
+        flags = 0
+        if args.nodistortion:
+            flags = cv2.CALIB_FIX_K1 | cv2.CALIB_FIX_K2 | cv2.CALIB_FIX_K3 | cv2.CALIB_FIX_K4 | cv2.CALIB_FIX_K5 | cv2.CALIB_FIX_K6 | cv2.CALIB_ZERO_TANGENT_DIST
+        print "calibrating...",len(img_points),"images"
+        rms, camera_matrix, dist_coefs, rvecs, tvecs = cv2.calibrateCamera(obj_points, img_points, (w, h), None, None,criteria=criteriacal,flags=flags)
+        print "error:", rms
+        print "camera matrix:\n", camera_matrix
+        print "distortion coefficients:", dist_coefs.transpose()
+        #cv2.destroyAllWindows()
 
-    if False:
-        # This is the code that computes rms
-        tot_error = 0
-        for i in xrange(len(obj_points)):
-            imgpoints2, _ = cv2.projectPoints(obj_points[i], rvecs[i], tvecs[i], camera_matrix, dist_coefs)
-            error = cv2.norm(img_points[i],imgpoints2, cv2.NORM_L2)/len(imgpoints2)
-            tot_error += error
-        mean_error = tot_error/len(obj_points)
-        print "total error: ", mean_error
+        #apertureWidth
+        #apertureHeight
+        if args.aperture:
+            fovx,fovy,focalLength,principalPoint,aspectRatio = cv2.calibrationMatrixValues(camera_matrix,(w,h),args.aperture[0],args.aperture[1])
 
 
-    outname = args.save
-    if outname is not None:
-        ci = dict(image_width=w,image_height=h,pattern_size=list(pattern_size_cols_rows),rms=rms,camera_matrix=camera_matrix.tolist(),dist=dist_coefs.ravel().tolist(),square_size=square_size)
-        print ci
-        yaml.dump(ci,open(outname,"wb"))
 
-    for i,y in enumerate(yaml_done):
-        o = yaml.load(open(y,"rb"))
-        o["rvec"] = rvecs[i].tolist()
-        o["tvec"] = tvecs[i].tolist()
-        yaml.dump(o,open(y,"wb"))
+        outname = args.save
+        if outname is not None:
+            ci = dict(image_width=w,image_height=h,pattern_size=list(pattern_size_cols_rows),rms=rms,camera_matrix=camera_matrix.tolist(),dist=dist_coefs.ravel().tolist(),square_size=square_size)
+            print ci
+            yaml.dump(ci,open(outname,"wb"))
+
+        for i,y in enumerate(yaml_done):
+            o = yaml.load(open(y,"rb"))
+            o["rms"] = recaberror(img_points[i],obj_points[i],rvecs[i],tvecs[i],camera_matrix,dist_coefs)
+            o["rvec"] = rvecs[i].tolist()
+            o["tvec"] = tvecs[i].tolist()
+            yaml.dump(o,open(y,"wb"))
 
 if __name__ == '__main__':
     main()

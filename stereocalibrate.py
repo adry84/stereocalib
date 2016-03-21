@@ -129,14 +129,14 @@ if __name__ == '__main__':
     parser.add_argument('--images2', help='path to yaml files of camera 2',required=True)
     parser.add_argument('--calib1', help='calibration file of camera 1',required=True)
     parser.add_argument('--calib2', help='calibration file of camera 2',required=True)
-    parser.add_argument('--suffix1', help='suffix for key')
-    parser.add_argument('--suffix2', help='suffix for key')
+    parser.add_argument('--suffix1', help='suffix for key',default="")
+    parser.add_argument('--suffix2', help='suffix for key',default="")
     parser.add_argument('--savealt', help='name of output calibration in YAML otherwise prints on console')
     parser.add_argument('--save', help='name of output calibration in YAML otherwise prints on console')
     parser.add_argument('--verbose',action="store_true")
     args = parser.parse_args()
 
-    term_crit = (cv2.TERM_CRITERIA_MAX_ITER + cv2.TERM_CRITERIA_EPS, 200, 1e-8)
+    term_crit = (cv2.TERM_CRITERIA_MAX_ITER + cv2.TERM_CRITERIA_EPS, 1000, 1e-8)
 
     images = []
     if os.path.isdir(args.images1):
@@ -152,11 +152,11 @@ if __name__ == '__main__':
         images2set[os.path.split(x)[1][0:-len(args.suffix2)]] = x  # remove the suffix if any
 
 
-    paramir = args.calib1
-    paramrgb = args.calib2
+    param1 = args.calib1
+    param2 = args.calib2
 
-    cam1calib = loadcalib(paramir)
-    cam2calib = loadcalib(paramrgb)
+    cam1calib = loadcalib(param1)
+    cam2calib = loadcalib(param2)
     print "input CAM1 calib",cam1calib
     print "input CAM2 calib",cam2calib
 
@@ -191,16 +191,13 @@ if __name__ == '__main__':
 
     flags = 0
     flags |= cv2.CALIB_FIX_INTRINSIC
-    #flags |= cv2.CALIB_USE_INTRINSIC_GUESS
+    flags |= cv2.CALIB_USE_INTRINSIC_GUESS
     #flags |= cv2.CALIB_FIX_PRINCIPAL_POINT
     #flags |= cv2.CALIB_FIX_FOCAL_LENGTH
     #flags |= cv2.CALIB_FIX_ASPECT_RATIO
     #flags |= cv2.CALIB_ZERO_TANGENT_DIST
     #flags |= cv2.CALIB_SAME_FOCAL_LENGTH
     #flags |= cv2.CALIB_RATIONAL_MODEL
-    flags |= cv2.CALIB_FIX_K3
-    flags |= cv2.CALIB_FIX_K4
-    flags |= cv2.CALIB_FIX_K5
     retval, cameraMatrix1, distCoeffs1, cameraMatrix2, distCoeffs2, R, T, E, F  = cv2.stereoCalibrate(obj_points,img_points1,img_points2,cam1size,cam1calib["camera_matrix"],cam1calib["dist"],cam2calib["camera_matrix"],cam2calib["dist"],criteria=term_crit,flags=flags)
 
     print "error is:",retval
@@ -228,8 +225,8 @@ if __name__ == '__main__':
         # Save 
         d = {}
         d["$RGBK$"] = flatten(cameraMatrix1)
-        d["$RGBD$"] = flatten(cameraMatrix2)
-        d["$DEPTHK$"] = flatten(distCoeffs1[0:5])
+        d["$RGBD$"] = flatten(distCoeffs1[0:5])
+        d["$DEPTHK$"] = flatten(cameraMatrix2)
         d["$DEPTHD$"] = flatten(distCoeffs2[0:5])
         d["$R$"] = flatten(R)
         d["$T$"] = flatten(T)
