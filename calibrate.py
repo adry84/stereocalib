@@ -208,7 +208,7 @@ def main():
 
         outname = args.save
         if outname is not None:
-            ci = dict(image_width=w,image_height=h,pattern_size=list(pattern_size_cols_rows),rms=rms,camera_matrix=camera_matrix.tolist(),dist=dist_coefs.ravel().tolist(),square_size=square_size)
+            ci = dict(image_width=w,image_height=h,pattern_size=list(pattern_size_cols_rows),rms=rms.tolist()[0],camera_matrix=camera_matrix.tolist(),dist=dist_coefs.ravel().tolist(),square_size=square_size)
             print ci
             yaml.dump(ci,open(outname,"wb"))
 
