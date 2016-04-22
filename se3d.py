@@ -4,6 +4,7 @@
 # WE LACK the other se3d operations: fuse inv mul sample unscented sqrt 
 import math
 import numpy as np
+from mprinter import mprint
 
 def _quaternion_from_matrix(matrix, isprecise=False):
     
@@ -83,21 +84,22 @@ def sinc(x):
     if math.fabs(x) < 1e-10:
         return 1.0
     else:
-        return math.sin(x)/x
+        return math.sin(math.pi*x)/(math.pi*x)
 
 def rodriguez2rot(omega):
     theta = np.linalg.norm(omega);
     if math.fabs(theta) < 1e-10:
-        A = 1;
+        A = 1.0;
         B = 0.5;
         C = 1/6.0;
+        S = np.zeros((3,3));
+        R = np.identity(3);
     else:
         A = sinc(theta);
-        B = (1-math.cos(theta))/(theta**2);
-        C = (1-A)/(theta**2);
-
-    S = skew(omega);
-    R = np.identity(3) + A*S + B*np.dot(S,S)
+        B = (1-math.cos(theta))/(theta*theta);
+        C = (1-A)/(theta*theta);
+        S = skew(omega);
+        R = np.identity(3) + A*S + B*np.dot(S,S)
     return R,S,B,C
 
 def rot2rodriguez(R):
@@ -221,19 +223,20 @@ def se3d_est(x,steps,gk=None):
 
 if __name__ == '__main__':
     def dump(x,n):
-        print n,"\nRaw:\n",x,"\nRot:\n",se3_getR(x),"\nT:",se3_gett(x),"\nrvec:",se3_getrvec(x)
+        mprint(n,"\n\tRaw:",x,"\tRot:",se3_getR(x),"\tT:",se3_gett(x),"\n\trvec:",se3_getrvec(x))
     a = se3_fromRvecT(0.5*np.array([1,0,0]),np.array([0.2,0.3,0.0]))
-    b = se3_fromRvecT(np.array([0,0,0]),np.array([0.2,0.3,0.0]))
-    print "a is",a
+    b = se3_fromRvecT(np.array([0,0,0]),np.array([0.8,0.3,0.2]))
     dump(a,"a")
+    dump(b,"b")
     ea = se3_log(a)
-    print ea
+    print "log a:",ea
     aea = se3_exp(ea)
     dump(aea,"exp log a")
     c = se3_mul(a,b)
     dump(c,"a * b")
-    print se3_log(c)
+    print "log c:",se3_log(c)
     ia = se3_inv(a)
     dump(ia,"inv a")
     E = se3d_est([a,b],5)
-    print E
+    dump(E["mean"],"Emean")
+    mprint("\tcov",E["Sigma"])
