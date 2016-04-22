@@ -165,6 +165,7 @@ if __name__ == '__main__':
     print "input CAM1 calib",cam1calib
     print "input CAM2 calib",cam2calib
 
+    poses = []
     poses1 = []
     poses2 = []
     relposes = []
@@ -192,38 +193,48 @@ if __name__ == '__main__':
             cam2size = (cam2info["height"],cam2info["width"])
             print fn,cam1size,cam2size,cam1info["world_points"].shape,cam1info["image_points"].shape,cam2info["image_points"].shape
             #obj_points.append(cam1info["world_points"])
-            poses.append(cam1info["tvec"] + cam1info["rvec"] + cam2info["tvec"] + cam2info["rvec"])
-            img_points1.append(cam1info["image_points"])
-            img_points2.append(cam2info["image_points"])
-            p1 = se3_fromRvecT(cam1info["rvec"],cam1info["tvec"])   # O -> P1
-            p2 = se3_fromRvecT(cam2info["rvec"],cam2info["tvec"])   # O -> P2
-            p2to1 = se3_mul(se3_inv(p2),p1)      # P2 -> P1 = inv(O -> P2) (O->P1)
-            relposes.append(p2to1)
-            poses1.append(p1)
-            poses2.append(p2)
+            if  "rvec" in cam1info and "rvec" in cam2info:
+              poses.append(cam1info["rvec"] + cam1info["tvec"] + cam2info["rvec"] + cam2info["tvec"])
+              img_points1.append(cam1info["image_points"])
+              img_points2.append(cam2info["image_points"])
+              p1 = se3_fromRvecT(cam1info["rvec"],cam1info["tvec"])   # O -> P1
+              p2 = se3_fromRvecT(cam2info["rvec"],cam2info["tvec"])   # O -> P2
+              p2to1 = se3_mul(se3_inv(p2),p1)      # P2 -> P1 = inv(O -> P2) (O->P1)
+              relposes.append(p2to1)
+              poses1.append(p1)
+              poses2.append(p2)
 
-
+    f = open("out.dat","wb")
+    for x in poses:
+      f.write(",".join([str(y[0]) for y in x]))
+      f.write("\n")
+    print "Done ",len(poses)
+    f.close()
     #retval, cameraMatrix1, distCoeffs1, cameraMatrix2, distCoeffs2, R, T, E, F  = cv2.stereoCalibrate(obj_points,img_points1,img_points2,cam1size,cam1calib["camera_matrix"],cam1calib["dist"],cam2calib["camera_matrix"],cam2calib["dist"],criteria=term_crit,flags=flags)
     #compute poses from SE3 tool, then reproject
-    se3d =  se3_est(relposes)
+    se3d =  se3d_est(relposes,10)
     T = se3_gett(se3d["mean"])
     R = se3_getR(se3d["mean"])
     r = se3_getrvec(se3d["mean"])
+    cameraMatrix1 = cam1calib["camera_matrix"]
+    cameraMatrix2 = cam2calib["camera_matrix"]
+    distCoeffs1 = cam1calib["dist"]
+    distCoeffs2 = cam1calib["dist"]
     # TODO reproject
-    retval = recaberror(poses1,poses2,se3d)
+    retval = recaberror(poses1,poses2,se3d["mean"])
     print "error is:",retval
-    print "orig cameraMatrix1\n",cam1calib["camera_matrix"]
-    print "orig cameraMatrix2\n",cam2calib["camera_matrix"]
+    print "orig cameraMatrix1\n",cameraMatrix1
+    print "orig cameraMatrix2\n",cameraMatrix2
     print "orig distCoeffs1",cam1calib["dist"]
     print "orig distCoeffs1",cam2calib["dist"]
     print "T\n",T
     print "R\n",R
     print "rvec\n",r
-    print "S\n",se3d["sigma"]
+    print "S\n",se3d["Sigma"]
 
     outname = args.savealt
     if outname is not None:
-        ci = dict(rms=retval,T=T.tolist(),R=R.tolist(),E=E.tolist(),F=F.tolist(),K1=cameraMatrix1.tolist(),K2=cameraMatrix2.tolist(),d1=distCoeffs1.tolist(),d2=distCoeffs2.tolist())
+        ci = dict(rms=retval,T=T.tolist(),R=R.tolist(),K1=cameraMatrix1.tolist(),K2=cameraMatrix2.tolist(),d1=distCoeffs1.tolist(),d2=distCoeffs2.tolist())
         print ci
         yaml.dump(ci,open(outname,"wb"))
 

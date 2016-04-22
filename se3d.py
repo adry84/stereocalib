@@ -176,13 +176,17 @@ def se3_fromQuatT(q,t):
     return y
 
 def se3_fromRvecT(R,t): 
+    if type(R) is list:
+        R = np.array(R)
+    if type(t) is list:
+        t = np.array(t)
     y = np.identity(4)
     y[0:3,0:3] = rodriguez2rot(R)[0];
-    y[0:3,3] = t
+    y[0:3,3] = t.transpose()
     return y
 
 def se3_dist(a,b):
-    return np.norm(se3_log(se3_mul(se3_inv(a),b)))
+    return np.linalg.norm(se3_log(se3_mul(se3_inv(a),b)))
 
 def se3_gett(X):
     return X[0:3,3]
