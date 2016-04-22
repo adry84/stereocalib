@@ -125,6 +125,10 @@ def loadimageinfo(name):
     d = yaml.load(o)
     d["image_points"] = np.array(d["image_points"],dtype=np.float32)
     d["world_points"] = np.array(d["world_points"],dtype=np.float32)
+    if "rvec" in d:
+      d["rvec"] = np.array(d["rvec"],dtype=np.float32)
+    if "tvec" in d:
+      d["tvec"] = np.array(d["tvec"],dtype=np.float32)
     return d
 
 if __name__ == '__main__':
@@ -194,7 +198,14 @@ if __name__ == '__main__':
             print fn,cam1size,cam2size,cam1info["world_points"].shape,cam1info["image_points"].shape,cam2info["image_points"].shape
             #obj_points.append(cam1info["world_points"])
             if  "rvec" in cam1info and "rvec" in cam2info:
-              poses.append(cam1info["rvec"] + cam1info["tvec"] + cam2info["rvec"] + cam2info["tvec"])
+              w = []
+              w.extend(cam1info["rvec"].transpose().tolist()[0])
+              w.extend(cam1info["tvec"].transpose().tolist()[0])
+              w.append(cam1info["rms"])
+              w.extend(cam2info["rvec"].transpose().tolist()[0])
+              w.extend(cam2info["tvec"].transpose().tolist()[0])
+              w.append(cam2info["rms"])
+              poses.append(w)
               img_points1.append(cam1info["image_points"])
               img_points2.append(cam2info["image_points"])
               p1 = se3_fromRvecT(cam1info["rvec"],cam1info["tvec"])   # O -> P1
@@ -204,9 +215,9 @@ if __name__ == '__main__':
               poses1.append(p1)
               poses2.append(p2)
 
-    f = open("out.dat","wb")
+    f = open("extracted.dat","wb")
     for x in poses:
-      f.write(",".join([str(y[0]) for y in x]))
+      f.write(",".join([str(y) for y in x]))
       f.write("\n")
     print "Done ",len(poses)
     f.close()

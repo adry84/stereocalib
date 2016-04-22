@@ -1,7 +1,7 @@
 #SE3D distribution package
 #Emanuele Ruffaldi
 #
-# WE LACK the other se3d operations: fuse inv mul sample unscented sqrt 
+# WE LACK the other se3d operations: fuse sample unscented sqrt 
 import math
 import numpy as np
 from mprinter import mprint
@@ -79,12 +79,15 @@ def _quaternion_matrix(quaternion):
         [    q[1, 3]-q[2, 0],     q[2, 3]+q[1, 0], 1.0-q[1, 1]-q[2, 2], 0.0],
         [                0.0,                 0.0,                 0.0, 1.0]])
 
-
-def sinc(x):
+# sin expansion: 
+#syms x real
+#simplify(taylor(sin(x)/x,x,0,'Order',6))
+def asinc(x):
     if math.fabs(x) < 1e-10:
-        return 1.0
+        x2 = x*x
+        return x2*x2/120 - x2/6 + 1
     else:
-        return math.sin(math.pi*x)/(math.pi*x)
+        return sin(x)/x
 
 def rodriguez2rot(omega):
     theta = np.linalg.norm(omega);
@@ -95,7 +98,7 @@ def rodriguez2rot(omega):
         S = np.zeros((3,3));
         R = np.identity(3);
     else:
-        A = sinc(theta);
+        A = asinc(theta);
         B = (1-math.cos(theta))/(theta*theta);
         C = (1-A)/(theta*theta);
         S = skew(omega);
@@ -104,7 +107,7 @@ def rodriguez2rot(omega):
 
 def rot2rodriguez(R):
     theta = math.acos((R.trace()-1)/2);
-    A = sinc(theta);
+    A = asinc(theta);
     small = math.fabs(theta) < 1e-10
     SO = (1/(2*A))*(R-R.transpose())  #% =skew(omega)
     if small:
@@ -199,7 +202,42 @@ def se3_getquat(X):
 
 def se3_getR(X):
     return X[0:3,0:3]
+
+def se3_adj(x):
+    R = x[0:3,0:3]
+    t = x[0:3,4]
+    y = numpy.zeros((6,6,))
+    y[0:3,0:3] = R
+    y[0:3,3:6] = numpy.dot(skew(t),R)
+    y[3:6,3:6] = R
+    return y
+
+def se3d_inv(a,b):
+    ga = a["mean"]
+    ca = a["Sigma"]
+    A = se3_adj(ga);
+    return se3d_set(se3_inv(ga),numpy.dot(A,numpy.dot(ca,numpy.transpose(A))))
     
+def se3d_mul(a,b):
+    ga = a["mean"]
+    gb = b["mean"]
+    ca = a["Sigma"]
+    cb = b["Sigma"]
+    A = se3_adj(ga);
+    return se3d_set(se3_mul(ga,gb),ca + numpy.dot(A,numpy.dot(cb,numpy.transpose(A))))
+def se3d_fuse(a,b):
+    """This demonstrates that numpy is ugly"""
+    ga = a["mean"]
+    gb = b["mean"]
+    ca = a["Sigma"]
+    cb = b["Sigma"]
+    #cy = c0 - c0/(c0 + c1)*c0;
+    cy = c0 - numoy.dot(numpy.dot(c0,numpy.linalg.inv(c0+c1)),c0)
+    v = se3_log(numpy.dot(gb,se3_inv(g0)))
+    gy = numpy.dot(se3_exp(numpy.dot(numpy.dot(gy,numpy.linalg.inv(g1)),v)),g0); 
+    return se3d_set(gy,cy);
+
+
 # x is an array of matrices 4x4 
 def se3d_est(x,steps,gk=None):
     N = len(x)
@@ -220,7 +258,7 @@ def se3d_est(x,steps,gk=None):
     igk = se3_inv(gk);
     for i in range(0,N):
         v_ik = se3_log(se3_mul(x[i],igk));
-        Sk = Sk + np.dot(v_ik.transpose(),v_ik);
+        Sk = Sk + np.dot(v_ik,v_ik.transpose());
     if N > 2:
         Sk = Sk / (N-1); # unbiased estimator
     return se3d_set(gk,Sk);
@@ -244,3 +282,6 @@ if __name__ == '__main__':
     E = se3d_est([a,b],5)
     dump(E["mean"],"Emean")
     mprint("\tcov",E["Sigma"])
+    iE = se3d_inv(E)
+    dump(iE["mean"],"iE")
+    

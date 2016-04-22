@@ -208,13 +208,13 @@ def main():
 
         outname = args.save
         if outname is not None:
-            ci = dict(image_width=w,image_height=h,pattern_size=list(pattern_size_cols_rows),rms=rms.tolist()[0],camera_matrix=camera_matrix.tolist(),dist=dist_coefs.ravel().tolist(),square_size=square_size)
+            ci = dict(image_width=w,image_height=h,pattern_size=list(pattern_size_cols_rows),rms=rms,camera_matrix=camera_matrix.tolist(),dist=dist_coefs.ravel().tolist(),square_size=square_size)
             print ci
             yaml.dump(ci,open(outname,"wb"))
 
         for i,y in enumerate(yaml_done):
             o = yaml.load(open(y,"rb"))
-            o["rms"] = recaberror(img_points[i],obj_points[i],rvecs[i],tvecs[i],camera_matrix,dist_coefs)
+            o["rms"] = float(recaberror(img_points[i],obj_points[i],rvecs[i],tvecs[i],camera_matrix,dist_coefs))
             o["rvec"] = rvecs[i].tolist()
             o["tvec"] = tvecs[i].tolist()
             yaml.dump(o,open(y,"wb"))
