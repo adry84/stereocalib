@@ -41,6 +41,8 @@ def main():
     parser.add_argument('--verbose',action="store_true")
     parser.add_argument('--ir',action='store_true')
     parser.add_argument('--threshold',type=int,default=0)
+    parser.add_argument('--flipy',action='store_true')
+    parser.add_argument('--flipx',action='store_true')
     parser.add_argument('--side',help="side: all,left,right",default="all")
     #parser.add_argument('--load',help="read intrinsics from file")
     #parser.add_argument('--nocalibrate',action="store_true",help="performs only reprojection")
@@ -84,6 +86,14 @@ def main():
     pattern_size_cols_rows = (args.pattern_size[0],args.pattern_size[1])
     pattern_points = np.zeros( (np.prod(pattern_size_cols_rows), 3), np.float32 )
     pattern_points[:,:2] = np.indices(pattern_size_cols_rows).T.reshape(-1, 2)
+
+    if args.flipy:
+        for i in range(0,pattern_points.shape[0]):
+            pattern_points[i,1] = args.pattern_size[1] - pattern_points[i,1] - 1
+
+    if args.flipx:
+        for i in range(0,pattern_points.shape[0]):
+            pattern_points[i,0] = args.pattern_size[0] - pattern_points[i,0] - 1
 
     # Non square patterns, broadcast product making a non-square grid
     if args.square_size2[0] != 0:

@@ -6,7 +6,8 @@ python calibrate.py ../depthview/color/*.png --save f200_color.yaml
 python calibrate.py ../depthview/ir/*.png --save f200_ir.yaml
 python stereocalibrate.py --images1 ../depthview/color --images2 ../depthview/ir --calib1 f200_color.yaml --calib2 f200_ir.yaml --save f200.yaml
 
-#f200.yaml is for Real Sense F200 with serial 040140087709
+# Devices 
+f200.yaml is for Real Sense F200 with serial 040140087709
 
 
 #See Also
