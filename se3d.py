@@ -4,14 +4,13 @@
 # WE LACK the other se3d operations: fuse sample unscented sqrt 
 import math
 import numpy as np
-from mprinter import mprint
+#from mprinter import mprint
 
 def _quaternion_from_matrix(matrix, isprecise=False):
-    
-    M = numpy.array(matrix, dtype=numpy.float64, copy=False)[:4, :4]
+    M = np.array(matrix, dtype=np.float64, copy=False)[:4, :4]
     if isprecise:
-        q = numpy.empty((4, ))
-        t = numpy.trace(M)
+        q = np.empty((4, ))
+        t = np.trace(M)
         if t > M[3, 3]:
             q[0] = t
             q[3] = M[1, 0] - M[0, 1]
@@ -29,6 +28,7 @@ def _quaternion_from_matrix(matrix, isprecise=False):
             q[k] = M[k, i] + M[i, k]
             q[3] = M[k, j] - M[j, k]
         q *= 0.5 / math.sqrt(t * M[3, 3])
+        # NEED MORMALIZE
     else:
         m00 = M[0, 0]
         m01 = M[0, 1]
@@ -40,40 +40,48 @@ def _quaternion_from_matrix(matrix, isprecise=False):
         m21 = M[2, 1]
         m22 = M[2, 2]
         # symmetric matrix K
-        K = numpy.array([[m00-m11-m22, 0.0,         0.0,         0.0],
+        K = np.array([[m00-m11-m22, 0.0,         0.0,         0.0],
                          [m01+m10,     m11-m00-m22, 0.0,         0.0],
                          [m02+m20,     m12+m21,     m22-m00-m11, 0.0],
                          [m21-m12,     m02-m20,     m10-m01,     m00+m11+m22]])
         K /= 3.0
         # quaternion is eigenvector of K that corresponds to largest eigenvalue
-        w, V = numpy.linalg.eigh(K)
-        q = V[[3, 0, 1, 2], numpy.argmax(w)]
+        w, V = np.linalg.eigh(K)
+        q = V[[3, 0, 1, 2], np.argmax(w)]
     if q[0] < 0.0:
-        numpy.negative(q, q)
-    return q
+        np.negative(q, q)
+    n = np.linalg.norm(q)
+    if n > 1.0:
+        q = q/n
+    # taken from ransformations.py so w first
+    return (q[0],q[1:])
 
 
-def _quaternion_matrix(quaternion):
+def _quaternion_matrix(quaternion_w_xyz):
+    _EPS = 1e-9
     """Return homogeneous rotation matrix from quaternion.
 
     >>> M = quaternion_matrix([0.99810947, 0.06146124, 0, 0])
-    >>> numpy.allclose(M, rotation_matrix(0.123, [1, 0, 0]))
+    >>> np.allclose(M, rotation_matrix(0.123, [1, 0, 0]))
     True
     >>> M = quaternion_matrix([1, 0, 0, 0])
-    >>> numpy.allclose(M, numpy.identity(4))
+    >>> np.allclose(M, np.identity(4))
     True
     >>> M = quaternion_matrix([0, 1, 0, 0])
-    >>> numpy.allclose(M, numpy.diag([1, -1, -1, 1]))
+    >>> np.allclose(M, np.diag([1, -1, -1, 1]))
     True
 
-    """
-    q = numpy.array(quaternion, dtype=numpy.float64, copy=True)
-    n = numpy.dot(q, q)
+    From transformations so it is (w,(xyz))
+    """ 
+    quaternion = (quaternion_w_xyz[0],quaternion_w_xyz[1][0],quaternion_w_xyz[1][1],quaternion_w_xyz[1][2])
+    quaternion = quaternion / np.linalg.norm(quaternion)
+    q = np.array(quaternion, dtype=np.float64, copy=True)
+    n = np.dot(q, q)
     if n < _EPS:
-        return numpy.identity(4)
+        return np.identity(4)
     q *= math.sqrt(2.0 / n)
-    q = numpy.outer(q, q)
-    return numpy.array([
+    q = np.outer(q, q)
+    return np.array([
         [1.0-q[2, 2]-q[3, 3],     q[1, 2]-q[3, 0],     q[1, 3]+q[2, 0], 0.0],
         [    q[1, 2]+q[3, 0], 1.0-q[1, 1]-q[3, 3],     q[2, 3]-q[1, 0], 0.0],
         [    q[1, 3]-q[2, 0],     q[2, 3]+q[1, 0], 1.0-q[1, 1]-q[2, 2], 0.0],
@@ -87,7 +95,7 @@ def asinc(x):
         x2 = x*x
         return x2*x2/120 - x2/6 + 1
     else:
-        return sin(x)/x
+        return math.sin(x)/x
 
 def rodriguez2rot(omega):
     theta = np.linalg.norm(omega);
@@ -173,6 +181,13 @@ def se3_fromRotT(R,t):
     y[0:3,3] = t
     return y
 
+def se3_getrpyurdf(X):
+    w,xyz = se3_getquat(X)
+    x,y,z = xyz
+    original = ( math.atan2(2 *(w*x + y*z), 1 - 2  *(x**2 + y**2)),
+        math.asin(2 * (w*y - z*x)),
+        math.atan2(2 *(w*z + x*y), 1 - 2 * (y**2 + z**2)))
+    return original
 def se3_fromQuatT(q,t):
     y = _quaternion_matrix(q)
     y[0:3,3] = t
@@ -206,9 +221,9 @@ def se3_getR(X):
 def se3_adj(x):
     R = x[0:3,0:3]
     t = x[0:3,4]
-    y = numpy.zeros((6,6,))
+    y = np.zeros((6,6,))
     y[0:3,0:3] = R
-    y[0:3,3:6] = numpy.dot(skew(t),R)
+    y[0:3,3:6] = np.dot(skew(t),R)
     y[3:6,3:6] = R
     return y
 
@@ -216,7 +231,7 @@ def se3d_inv(a,b):
     ga = a["mean"]
     ca = a["Sigma"]
     A = se3_adj(ga);
-    return se3d_set(se3_inv(ga),numpy.dot(A,numpy.dot(ca,numpy.transpose(A))))
+    return se3d_set(se3_inv(ga),np.dot(A,np.dot(ca,np.transpose(A))))
     
 def se3d_mul(a,b):
     ga = a["mean"]
@@ -224,17 +239,17 @@ def se3d_mul(a,b):
     ca = a["Sigma"]
     cb = b["Sigma"]
     A = se3_adj(ga);
-    return se3d_set(se3_mul(ga,gb),ca + numpy.dot(A,numpy.dot(cb,numpy.transpose(A))))
+    return se3d_set(se3_mul(ga,gb),ca + np.dot(A,np.dot(cb,np.transpose(A))))
 def se3d_fuse(a,b):
-    """This demonstrates that numpy is ugly"""
+    """This demonstrates that np is ugly"""
     ga = a["mean"]
     gb = b["mean"]
     ca = a["Sigma"]
     cb = b["Sigma"]
     #cy = c0 - c0/(c0 + c1)*c0;
-    cy = c0 - numoy.dot(numpy.dot(c0,numpy.linalg.inv(c0+c1)),c0)
-    v = se3_log(numpy.dot(gb,se3_inv(g0)))
-    gy = numpy.dot(se3_exp(numpy.dot(numpy.dot(gy,numpy.linalg.inv(g1)),v)),g0); 
+    cy = c0 - numoy.dot(np.dot(c0,np.linalg.inv(c0+c1)),c0)
+    v = se3_log(np.dot(gb,se3_inv(g0)))
+    gy = np.dot(se3_exp(np.dot(np.dot(gy,np.linalg.inv(g1)),v)),g0); 
     return se3d_set(gy,cy);
 
 
