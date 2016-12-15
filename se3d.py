@@ -1,10 +1,11 @@
-"""Summary
 """
 # SE3D distribution package
 #
 # Copyright Emanuele Ruffaldi, Scuola Superiore Sant'Anna 2016
 #
-# Missing functions: fuse sample unscented sqrt
+# Missing functions: sample unscented sqrt
+
+"""
 import math
 import numpy as np
 from mprinter import mprint
