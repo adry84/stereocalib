@@ -34,6 +34,11 @@ def recaberror(img_points,obj_points,rvec,tvec,camera_matrix,dist_coeffs):
     mean_error=np.sqrt(tot_error/total_points)
     return mean_error
 
+def loadcalib(name):
+    o = yaml.load(open(name,"rb"))
+    o["camera_matrix"] = np.array(o["camera_matrix"],dtype=np.float32)
+    o["dist"]= np.array(o["dist"],dtype=np.float32) 
+    return o
 def main():
     parser = argparse.ArgumentParser(description='Camera Calibrator - OpenCV and Emanuele Ruffaldi SSSA 2014-2015')
     parser.add_argument('path', help='path where images can be found (png or jpg)',nargs="+")
@@ -41,6 +46,7 @@ def main():
     parser.add_argument('--verbose',action="store_true")
     parser.add_argument('--ir',action='store_true')
     parser.add_argument('--threshold',type=int,default=0)
+    parser.add_argument('--calib',type=str,help="default calib for guess or nocalibrate mode")
     parser.add_argument('--flipy',action='store_true')
     parser.add_argument('--flipx',action='store_true')
     parser.add_argument('--side',help="side: all,left,right",default="all")
@@ -77,11 +83,18 @@ def main():
         if args.noextract:
             pass
 
+    if args.calib:
+        calib = loadcalib(args.calib)
+    else:
+        calib = dict(camera_matrix=None,dist=None)
+
+
     img_names = []
     for p in args.path:
         img_names.extend(glob(p))
     debug_dir = args.debug
     square_size = args.square_size
+    print "square_size is",square_size
 
     pattern_size_cols_rows = (args.pattern_size[0],args.pattern_size[1])
     pattern_points = np.zeros( (np.prod(pattern_size_cols_rows), 3), np.float32 )
@@ -119,6 +132,16 @@ def main():
 
     print "images",img_names
     j = 0
+    img_namesr = []
+    for fn in (sorted(img_names)):
+        if os.path.isdir(fn):
+            for y in os.listdir(fn):
+                if y.endswith(".jpg") or y.endswith(".png"):
+                    img_namesr.append(os.path.join(fn,y))
+        else:
+            img_namesr.append(fn)
+    img_names = img_namesr
+
     for fn in (sorted(img_names)):
         if fn.endswith(".yaml"):
             continue
@@ -202,8 +225,10 @@ def main():
         flags = 0
         if args.nodistortion:
             flags = cv2.CALIB_FIX_K1 | cv2.CALIB_FIX_K2 | cv2.CALIB_FIX_K3 | cv2.CALIB_FIX_K4 | cv2.CALIB_FIX_K5 | cv2.CALIB_FIX_K6 | cv2.CALIB_ZERO_TANGENT_DIST
+        if args.calib:
+            flags = flags  | cv2.CV_CALIB_USE_INTRINSIC_GUESS
         print "calibrating...",len(img_points),"images"
-        rms, camera_matrix, dist_coefs, rvecs, tvecs = cv2.calibrateCamera(obj_points, img_points, (w, h), None, None,criteria=criteriacal,flags=flags)
+        rms, camera_matrix, dist_coefs, rvecs, tvecs = cv2.calibrateCamera(obj_points, img_points, (w, h), calib["camera_matrix"], calib["dist"],criteria=criteriacal,flags=flags)
         print "error:", rms
         print "camera matrix:\n", camera_matrix
         print "distortion coefficients:", dist_coefs.transpose()
@@ -228,6 +253,15 @@ def main():
             o["rvec"] = rvecs[i].tolist()
             o["tvec"] = tvecs[i].tolist()
             yaml.dump(o,open(y,"wb"))
+    elif calib["camera_matrix"] is not None:
+        for i,y in enumerate(yaml_done):
+            retval,rvec,tvec = cv2.solvePnP(obj_points[i], img_points[i], calib["camera_matrix"],calib["dist"])
+            o = yaml.load(open(y,"rb"))
+            o["rms"] = float(recaberror(img_points[i],obj_points[i],rvec,tvec,calib["camera_matrix"],calib["dist"]))
+            o["rvec"] = rvec.tolist()
+            o["tvec"] = tvec.tolist()
+            yaml.dump(o,open(y,"wb"))
+
 
 if __name__ == '__main__':
     main()

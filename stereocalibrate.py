@@ -121,16 +121,23 @@ def loadimageinfo(name):
     d["image_points"] = np.array(d["image_points"],dtype=np.float32)
     d["world_points"] = np.array(d["world_points"],dtype=np.float32)
     return d
-
+def str2bool(v):
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Stereo Pair Calibrator - OpenCV and Emanuele Ruffaldi SSSA 2014-2015')
     parser.add_argument('--images1', help='path to yaml files of camera 1',required=True)
     parser.add_argument('--images2', help='path to yaml files of camera 2',required=True)
-    parser.add_argument('--calib1', help='calibration file of camera 1',required=True)
-    parser.add_argument('--calib2', help='calibration file of camera 2',required=True)
+    parser.add_argument('--calib1', help='calibration file of camera 1')
+    parser.add_argument('--calib2', help='calibration file of camera 2')
     parser.add_argument('--suffix1', help='suffix for key',default="")
     parser.add_argument('--suffix2', help='suffix for key',default="")
+    parser.add_argument('--fixint', type=str2bool, nargs='?',const=True, default=True)
     parser.add_argument('--savealt', help='name of output calibration in YAML otherwise prints on console')
     parser.add_argument('--save', help='name of output calibration in YAML otherwise prints on console')
     parser.add_argument('--verbose',action="store_true")
@@ -155,10 +162,16 @@ if __name__ == '__main__':
     param1 = args.calib1
     param2 = args.calib2
 
-    cam1calib = loadcalib(param1)
-    cam2calib = loadcalib(param2)
-    print "input CAM1 calib",cam1calib
-    print "input CAM2 calib",cam2calib
+    if param1 is not None:
+      cam1calib = loadcalib(param1)
+      print "input CAM1 calib",cam1calib
+    else:
+      cam1calib = dict(camera_matrix=None,dist=None)
+    if param2 is not None:
+      cam2calib = loadcalib(param2)
+      print "input CAM2 calib",cam2calib
+    else:
+      cam2calib = dict(camera_matrix=None,dist=None)
 
     obj_points = []
     img_points1 = []
@@ -190,8 +203,12 @@ if __name__ == '__main__':
 
 
     flags = 0
-    flags |= cv2.CALIB_FIX_INTRINSIC
-    flags |= cv2.CALIB_USE_INTRINSIC_GUESS
+    if args.fixint:
+      print "fix intrinsics"
+      flags |= cv2.CALIB_FIX_INTRINSIC
+      flags |= cv2.CALIB_USE_INTRINSIC_GUESS
+    elif cam1calib["camera_matrix"] is not None and cam2calib["camera_matrix"] is not None:
+      flags |= cv2.CALIB_USE_INTRINSIC_GUESS
     #flags |= cv2.CALIB_FIX_PRINCIPAL_POINT
     #flags |= cv2.CALIB_FIX_FOCAL_LENGTH
     #flags |= cv2.CALIB_FIX_ASPECT_RATIO

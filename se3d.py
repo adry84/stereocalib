@@ -165,7 +165,8 @@ def rot2rodriguez(R):
     Returns:
         TYPE: Description
     """
-    theta = math.acos((R.trace()-1)/2)
+    z = min(1,(R.trace()-1)/2)
+    theta = math.acos(z)
     A = asinc(theta)
     small = math.fabs(theta) < 1e-10
     SO = (1/(2*A))*(R-R.transpose())  # % =skew(omega)
@@ -495,7 +496,8 @@ def se3d_est(x, steps, gk=None):
         distribution: a SE3 distribution
     """
     N = len(x)
-
+    if N == 0:
+        return x
     if gk is None:
         gk = x[0]  # % starting => random selection
 

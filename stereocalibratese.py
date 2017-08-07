@@ -214,6 +214,9 @@ if __name__ == '__main__':
               relposes.append(p2to1)
               poses1.append(p1)
               poses2.append(p2)
+              print "donepose",len(relposes)
+            else:
+              print "missing rvec,tvec in cam2info"
 
     f = open("extracted.dat","wb")
     for x in poses:
@@ -223,14 +226,18 @@ if __name__ == '__main__':
     f.close()
     #retval, cameraMatrix1, distCoeffs1, cameraMatrix2, distCoeffs2, R, T, E, F  = cv2.stereoCalibrate(obj_points,img_points1,img_points2,cam1size,cam1calib["camera_matrix"],cam1calib["dist"],cam2calib["camera_matrix"],cam2calib["dist"],criteria=term_crit,flags=flags)
     #compute poses from SE3 tool, then reproject
-    se3d =  se3d_est(relposes,10)
-    T = se3_gett(se3d["mean"])
-    R = se3_getR(se3d["mean"])
-    r = se3_getrvec(se3d["mean"])
     cameraMatrix1 = cam1calib["camera_matrix"]
     cameraMatrix2 = cam2calib["camera_matrix"]
     distCoeffs1 = cam1calib["dist"]
     distCoeffs2 = cam1calib["dist"]
+    if len(relposes) > 0:
+      se3d =  se3d_est(relposes,10)
+      T = se3_gett(se3d["mean"])
+      R = se3_getR(se3d["mean"])
+      r = se3_getrvec(se3d["mean"])
+    else:
+      print "missing relposes!"
+      sys.exit(0)
     # TODO reproject
     retval = recaberror(poses1,poses2,se3d["mean"])
     print "error is:",retval
